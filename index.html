@@ -126,6 +126,23 @@ return dateObj.getHours();
 <hr>
 
 <h1>
+<a id="usage-filtering-event-firehose-using-device-id-in-widgets" class="anchor" href="#usage-filtering-event-firehose-using-device-id-in-widgets" aria-hidden="true"><span class="octicon octicon-link"></span></a>Usage: Filtering event firehose using Device ID in widgets</h1>
+
+<p>Due to the way the current Particle local cloud works, we are unable to retrieve device-specific or device-and-event-specific SSEs for direct usage. Therefore, a workaround needs to be included in the .JS editor in freeboard.</p>
+
+<p>After setting up your datasource SSE, create a widget, and follow the guidelines below, using a Text widget as an example. In the widget's settings, click on the .JS editor and wrap the following if...else condition:</p>
+
+<pre><code>var id = datasources["your_datasource"]["coreid"];
+if(id=="[deviceID]") {    // replace with the Device ID that you are targeting
+    return datasources["your_datasource"]["data"];    // or customised code depending on the JSON you generated
+}
+</code></pre>
+
+<p>Note: sample above is just a guideline; alter the fields to match your own scenario.</p>
+
+<hr>
+
+<h1>
 <a id="authors-and-contributors" class="anchor" href="#authors-and-contributors" aria-hidden="true"><span class="octicon octicon-link"></span></a>Authors and Contributors</h1>
 
 <p>Original plugin: 2014 Krishnaraj Varma (<a href="https://github.com/krvarma" class="user-mention">@krvarma</a>)<br>
