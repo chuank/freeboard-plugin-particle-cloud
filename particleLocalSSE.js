@@ -1,20 +1,89 @@
 (function () {
+        /*
+            Datasource Definition
+        */
+
+        freeboard.loadDatasourcePlugin({
+                "type_name": "particleSSE",
+                "display_name": "Particle Local Cloud SSE",
+                "description": "Subscribe to SSE (Server-Sent-Events) broadcast by the <strong>Particle Local Cloud</strong>.",
+                "settings": [
+                        /*      TODO: Add DEVICEID filtering support once local cloud device firehose is fixed by Particle.io
+                        {
+                                name: "deviceId",
+                                display_name: "Device ID",
+                                description: '',
+                                type: "text",
+                        },
+                        */
+                        {
+                                name: "cloudURL",
+                                display_name: "Local Cloud URL",
+                                description: 'example: http://particle.local:8080',
+                                type: "text",
+                        },
+                        {
+                                name: "accessToken",
+                                display_name: "Local Cloud Access Token",
+                                description: '',
+                                type: "text",
+                        },
+                        {
+                                name: "eventName",
+                                display_name: "Event Name",
+                                description: '',
+                                type: "text",
+                        }
+                ],
+                newInstance: function (settings, newInstanceCallback, updateCallback) {
+                        newInstanceCallback(new sseDatasource(settings, updateCallback));
+                }
+        });
+
+
+        /*
+            Datasource Implementation
+        */
         var sseDatasource = function (settings, updateCallback) {
+
                 var self = this;
                 var currentSettings = settings;
+                var eventSource;
 
-                self.updateNow = function () {
-                    /* current release of the local Particle spark-server limits us to view SSEs only via the public firehose, i.e. no device-specific information can be routed
+                function startSSE() {
+                    /* current release of the local Particle spark-server limits us to view SSEs only via the public firehose, i.e. no device-specific information can be rou$
                        FIREHOSE: curl -H "Authorization: Bearer [access_token]" http://particle.local:8080/v1/events/[eventname] (or empty for ALL events)
                        DEVICE-SPECIFIC (as yet unsupported): curl -H "Authorization: Bearer [access_token]" http://particle.local:8080/v1/devices/[deviceID]/events
                     */
 
-                    var eventSource = new EventSource(currentSettings.cloudURL + "/v1/events/" + currentSettings.eventName + "?access_token=" + currentSettings.accessToken);
-                    //var eventSource = new EventSource("http://localhost:8080/v1/devices/" + currentSettings.deviceId + "/events/?access_token=" + currentSettings.accessToken);
+                    eventSource = new EventSource(currentSettings.cloudURL + "/v1/events/" + currentSettings.eventName + "?access_token=" + currentSettings.accessToken);
 
-                    eventSource.addEventListener('open', function(e) { },false);
+                    eventSource.addEventListener('open', function(e) {
+                        switch( e.target.readyState ) {
+                          // if reconnecting
+                          case EventSource.CONNECTING:
+                            console.log("EVENTSOURCE_ERR: SSE Reconnecting…");
+                            break;
+                          // if error was fatal
+                          case EventSource.CLOSED:
+                            console.log("EVENTSOURCE_ERR: Connection failed. Will not retry.");
+                            break;
+                        }
+                        console.log("EVENTSOURCE: Opened new connection for event: " + currentSettings.eventName);
+                    },false);
 
-                    eventSource.addEventListener('error', function(e) { },false);
+                    eventSource.addEventListener('error', function(e) {
+                        switch( e.target.readyState ) {
+                          // if reconnecting
+                          case EventSource.CONNECTING:
+                            console.log("EVENTSOURCE_ERR: SSE Reconnecting…");
+                            break;
+                          // if error was fatal
+                          case EventSource.CLOSED:
+                            console.log("EVENTSOURCE_ERR: Connection failed. Will not retry.");
+                            break;
+                        }
+                    },false);
 
                     eventSource.addEventListener(currentSettings.eventName, function(e) {
                         var parsedData = JSON.parse(e.data);
@@ -22,51 +91,29 @@
                     }, false);
                 }
 
+                function disposeSSE() {
+                        // dispose of EventSource SSE connection if it already exists
+                        if(eventSource != undefined) {
+                                console.log("EVENTSOURCE: closing connection");
+                                eventSource.close();
+                                eventSource = undefined;
+                        }
+                }
+
+                self.updateNow = function () {
+                        disposeSSE();           // always get rid of previous SSE first
+                        startSSE();
+                }
+
                 self.onDispose = function () {
-                        // dispose of EventSource SSE connection
-                        eventSource.close();
+                        disposeSSE();
                 }
 
                 self.onSettingsChanged = function (newSettings) {
                         currentSettings = newSettings;
                                 self.updateNow();
                         }
+                        console.log("EVENTSOURCE: settings changed, re-initialising");
                 };
-
-                freeboard.loadDatasourcePlugin({
-                        "type_name": "particleSSE",
-                        "display_name": "Particle Local Cloud SSE",
-                        "settings": [
-                                /*      TODO, once local cloud device firehose is fixed by Particle.io
-                                {
-                                        name: "deviceId",
-                                        display_name: "Device ID",
-                                        description: '',
-                                        type: "text",
-                                },
-                                */
-                                {
-                                        name: "cloudURL",
-                                        display_name: "Local Cloud URL",
-                                        description: 'example: http://localhost:8080',
-                                        type: "text",
-                                },
-                                {
-                                        name: "accessToken",
-                                        display_name: "Access Token",
-                                        description: '',
-                                        type: "text",
-                                },
-                                {
-                                        name: "eventName",
-                                        display_name: "Event Name",
-                                        description: '',
-                                        type: "text",
-                                }
-                        ],
-                        newInstance: function (settings, newInstanceCallback, updateCallback) {
-                                newInstanceCallback(new sseDatasource(settings, updateCallback));
-                        }
-                });
         }
 ());
