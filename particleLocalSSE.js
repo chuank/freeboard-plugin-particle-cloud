@@ -1,6 +1,6 @@
 (function () {
         /*
-            Datasource Definition
+            Datasource Definition - what shows up on the dialog box
         */
 
         freeboard.loadDatasourcePlugin({
@@ -8,7 +8,7 @@
                 "display_name": "Particle Local Cloud SSE",
                 "description": "Subscribe to SSE (Server-Sent-Events) broadcast by the <strong>Particle Local Cloud</strong>.",
                 "settings": [
-                        /*      TODO: Add DEVICEID filtering support once local cloud device firehose is fixed by Particle.io
+                        /*      TODO #1: Add DEVICEID filtering support once local cloud device firehose is fixed by Particle.io
                         {
                                 name: "deviceId",
                                 display_name: "Device ID",
@@ -40,7 +40,6 @@
                 }
         });
 
-
         /*
             Datasource Implementation
         */
@@ -49,6 +48,14 @@
                 var self = this;
                 var currentSettings = settings;
                 var eventSource;
+                var keepAliveTimer = null;
+                var keepAliveInterval = 30;         // seconds
+
+                function checkAlive() {
+                    // check if EventSource connection is still alive; if it is, reset the timer, if not, let the timeout force a disconnect/reconnect
+                    if(keepAliveTimer != null) clearTimeout(keepAliveTimer);
+                    keepAliveTimer = setTimeout(self.updateNow, keepAliveInterval * 1000);
+                }
 
                 function startSSE() {
                     /* current release of the local Particle spark-server limits us to view SSEs only via the public firehose, i.e. no device-specific information can be rou$
@@ -86,6 +93,8 @@
                     },false);
 
                     eventSource.addEventListener(currentSettings.eventName, function(e) {
+                        // reset the keepAlive interval timer!
+                        checkAlive();
                         var parsedData = JSON.parse(e.data);
                         updateCallback(parsedData);
                     }, false);
@@ -102,6 +111,7 @@
 
                 self.updateNow = function () {
                         disposeSSE();           // always get rid of previous SSE first
+                        checkAlive();
                         startSSE();
                 }
 
